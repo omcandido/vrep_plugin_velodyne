@@ -5,6 +5,9 @@
 
 #define PI_VAL (3.14159265f)
 
+// if you want to use /velodyne_points topic locally, put it true
+#define _B_LOCALLY false
+
 int CVelodyneROSModel::_nextVelodyneHandle=0;
 
 
@@ -170,6 +173,17 @@ bool CVelodyneROSModel::handle(float dt)
                                 if (rr<RR)
                                 {
                                     float dp[3]={p[0],p[1],p[2]};
+
+                                    // if true, point clouds are published locally. otherwise globally
+                                    if (_B_LOCALLY){
+                                        m[3] = 0;
+                                        m[7] = 0;
+                                        m[11] = 0;
+                                        mainSensTrInv[3] = 0;
+                                        mainSensTrInv[7] = 0;
+                                        mainSensTrInv[11] = 0;
+                                    }
+
                                     simTransformVector(m,p); //directly relative to /odom (which in simulation is actually /map)
                                     float abs_p[3]={p[0],p[1],p[2]};
                                     simTransformVector(mainSensTrInv,p);
