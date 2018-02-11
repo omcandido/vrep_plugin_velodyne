@@ -12,10 +12,12 @@ int CVelodyneROSModel::_nextVelodyneHandle=0;
 
 
 
-CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle)
+CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle, int local_frame_handle)
 {
     for (int i=0;i<4;i++)
         _visionSensorHandles[i]=visionSensorHandles[i];
+
+
     _frequency=frequency;
     _displayScalingFactor=1.0f;
     _displayPts=(options&1)==0;
@@ -30,6 +32,9 @@ CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float freq
     _coloringDistances[1]=coloringDistances[1];
     lastScanAngle=0.0f;
     _velodyneHandle=_nextVelodyneHandle++;
+
+    _local_frame_handle = local_frame_handle;
+
 
     _RANGE=0;
     _pubVelodyne =ROS_server::getPublisher();
@@ -124,6 +129,12 @@ bool CVelodyneROSModel::handle(float dt)
         simGetObjectMatrix(_visionSensorHandles[0],-1,mainSensTr);
         simGetObjectMatrix(_visionSensorHandles[0],-1,mainSensTrInv);
         simInvertMatrix(mainSensTrInv);
+
+        // get pointcloud locally
+        float local_frame_mat_inverse[12];
+        simGetObjectMatrix(_local_frame_handle, -1, local_frame_mat_inverse);
+        simInvertMatrix(local_frame_mat_inverse);
+
         if (_ptCloudHandle>=0)
             simModifyPointCloud(_ptCloudHandle,0,0,0);
         if (_newPtCloudHandle>=0)
@@ -182,13 +193,29 @@ bool CVelodyneROSModel::handle(float dt)
                                         mainSensTrInv[3] = 0;
                                         mainSensTrInv[7] = 0;
                                         mainSensTrInv[11] = 0;
+
                                     }
 
                                     simTransformVector(m,p); //directly relative to /odom (which in simulation is actually /map)
+
+
+                                    if(_B_LOCALLY){
+                                        local_frame_mat_inverse[3] = 0;
+                                        local_frame_mat_inverse[7] = 0;
+                                        local_frame_mat_inverse[11] = 0;
+                                        simTransformVector(local_frame_mat_inverse, p);
+                                    }
+
                                     float abs_p[3]={p[0],p[1],p[2]};
-                                    simTransformVector(mainSensTrInv,p);
+
+                                    if(!_B_LOCALLY){
+                                        simTransformVector(mainSensTrInv,p);
+                                    }
+
                                     float a=atan2(p[0],p[2]);
-                                    if (   ((a>=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange)) || ((a<=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange-2.0f*PI_VAL))   )
+
+                                    /* if (   ((a>=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange)) || ((a<=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange-2.0f*PI_VAL))   ) */
+                                    if(true)
                                     {
                                         float r=sqrt(rr);
                                         if (_cartesianCoords)
