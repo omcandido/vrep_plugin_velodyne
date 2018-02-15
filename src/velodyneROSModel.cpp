@@ -237,9 +237,17 @@ bool CVelodyneROSModel::handle(float dt)
                                             dp[2]*=_displayScalingFactor;
                                             simTransformVector(m,dp);
                                             _displayPtsA.push_back(a);
-                                            _displayPtsXyz.push_back(dp[0]);
-                                            _displayPtsXyz.push_back(dp[1]);
-                                            _displayPtsXyz.push_back(dp[2]);
+                                            if(_B_LOCALLY){
+                                                // compenstate xyz coordinates when you are using Local Frame
+                                                _displayPtsXyz.push_back(dp[0] + local_frame_mat[3]);
+                                                _displayPtsXyz.push_back(dp[1] + local_frame_mat[7]);
+                                                _displayPtsXyz.push_back(dp[2] + local_frame_mat[11]);
+                                            }
+                                            else{
+                                                _displayPtsXyz.push_back(dp[0]);
+                                                _displayPtsXyz.push_back(dp[1]);
+                                                _displayPtsXyz.push_back(dp[2]);
+                                            }
                                             _getColorFromIntensity(1.0f-((r-_coloringDistances[0])/(_coloringDistances[1]-_coloringDistances[0])),col);
                                             _displayPtsCol.push_back(col[0]);
                                             _displayPtsCol.push_back(col[1]);
