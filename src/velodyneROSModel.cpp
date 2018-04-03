@@ -42,8 +42,8 @@ CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float freq
     //initialize the fixed fields of the output PointCloud2 message
     _buffer.header.frame_id="odom";
     _buffer.height=1; //unordered data
-    _buffer.fields.resize(3); //convert x/y/z to fields
-    _buffer.fields[0].name = "x"; _buffer.fields[1].name = "y"; _buffer.fields[2].name = "z";
+    _buffer.fields.resize(4); //convert x/y/z/intensity to fields
+    _buffer.fields[0].name = "x"; _buffer.fields[1].name = "y"; _buffer.fields[2].name = "z"; _buffer.fields[3].name = "intensity";
     int offset=0;
     for (size_t d =0; d < _buffer.fields.size(); ++d, offset +=4)
     {
@@ -179,7 +179,7 @@ bool CVelodyneROSModel::handle(float dt)
                             unsigned char col[3];
                             for (int j=0;j<ptsX*ptsY;j++)
                             {
-                                float p[3]={data[off+4*j+0],data[off+4*j+1],data[off+4*j+2]};
+                                float p[4]={data[off+4*j+0],data[off+4*j+1],data[off+4*j+2],data[off+4*j+3]};
                                 float rr=p[0]*p[0]+p[1]*p[1]+p[2]*p[2];
                                 if (rr<RR)
                                 {
@@ -223,6 +223,7 @@ bool CVelodyneROSModel::handle(float dt)
                                             pts.push_back(abs_p[0]);
                                             pts.push_back(abs_p[1]);
                                             pts.push_back(abs_p[2]);
+                                            pts.push_back(abs_p[3]);
                                         }
                                         else
                                         {
@@ -371,7 +372,7 @@ void CVelodyneROSModel::_getColorFromIntensity(float intensity,unsigned char col
 
 void CVelodyneROSModel::addPointsToBuffer(std::vector<float> & pts, sensor_msgs::PointCloud2 & buff)
 {
-    int n_points = pts.size()/3;
+    int n_points = pts.size()/4;
     int prev_width= buff.width*buff.point_step;
     buff.width += n_points;
     buff.row_step = buff.point_step*buff.width;
@@ -381,8 +382,9 @@ void CVelodyneROSModel::addPointsToBuffer(std::vector<float> & pts, sensor_msgs:
     //copy data points
     for (int cp = 0; cp < n_points; ++cp)
     {
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[0].offset], &pts[3*cp+0], sizeof(float));
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[1].offset], &pts[3*cp+1], sizeof(float));
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[2].offset], &pts[3*cp+2], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[0].offset], &pts[4*cp+0], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[1].offset], &pts[4*cp+1], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[2].offset], &pts[4*cp+2], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[3].offset], &pts[4*cp+3], sizeof(float));
     }
 }
