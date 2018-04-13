@@ -165,6 +165,24 @@ bool CVelodyneROSModel::handle(float dt)
                 {
                     float farClippingPlane;
                     simGetObjectFloatParameter(_visionSensorHandles[i],1001,&farClippingPlane);
+                    // code added for Intensity field [x,y,z,intensity]
+                    float* img_data;
+                    float img_data2[64][1024] = {0};
+                    float img_data3[65536] = {0};     // 1024 * 64 = 65536
+                    // get image from velodyne vision sensor
+                    img_data = simGetVisionSensorImage(_visionSensorHandles[i]);
+                    for (int j = 0 ; j < 320 ; j++) {      // vision sensor Resolution Y value : 320
+                        for(int i = 0 ; i < 1024 ; i++) {  // vision sensor Resolution X value : 1024
+                            if(j % 5 == 0)
+                                img_data2[j/5][i] = img_data[3*(i+(319-j)*1024)+1];
+                        }
+                    }
+                    // tranpose matrix to visualize intensity fields
+                    for(int i = 0 ; i < 1024 ; i++) {
+                        for (int j = 0 ; j < 64 ; j++) {
+                            img_data3[64*i + j] = img_data2[j][i];
+                        }
+                    }
                     float RR=(farClippingPlane*0.99f)*(farClippingPlane*0.99f);
                     float m[12];
                     simGetObjectMatrix(_visionSensorHandles[i],-1,m);
@@ -223,7 +241,7 @@ bool CVelodyneROSModel::handle(float dt)
                                             pts.push_back(abs_p[0]);
                                             pts.push_back(abs_p[1]);
                                             pts.push_back(abs_p[2]);
-                                            pts.push_back(abs_p[3]);
+                                            pts.push_back(img_data3[ptsX*ptsY-j]); // intensity field added
                                         }
                                         else
                                         {
@@ -385,6 +403,6 @@ void CVelodyneROSModel::addPointsToBuffer(std::vector<float> & pts, sensor_msgs:
         memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[0].offset], &pts[4*cp+0], sizeof(float));
         memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[1].offset], &pts[4*cp+1], sizeof(float));
         memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[2].offset], &pts[4*cp+2], sizeof(float));
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[3].offset], &pts[4*cp+3], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[3].offset], &pts[4*cp+3], sizeof(float)); // intensity field added
     }
 }
