@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(vrep_plugin_velodyne)
 
-find_package(
-	catkin)
+set (CMAKE_CXX_STANDARD 11)
+
+find_package(catkin REQUIRED COMPONENTS
+            roscpp
+            std_msgs
+            sensor_msgs
+            cmake_modules
+            message_generation
+            )
 
 catkin_package(
                CATKIN_DEPENDS roscpp rosconsole std_msgs roslib
