@@ -8,7 +8,7 @@
 class CVelodyneROSModel
 {
 public:
-    CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle);
+    CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle, int local_frame_handle);
     virtual ~CVelodyneROSModel();
 
     int getVelodyneHandle();
@@ -34,6 +34,7 @@ private:
     int _newPtCloudHandle;
     float lastScanAngle;
     float _coloringDistances[2];
+    int _local_frame_handle;
     std::vector<float> _displayPtsXyz;
     std::vector<float> _displayPtsA;
     std::vector<unsigned char> _displayPtsCol;

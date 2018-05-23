@@ -5,14 +5,19 @@
 
 #define PI_VAL (3.14159265f)
 
+// if you want to use /velodyne_points topic locally, put it true
+#define _B_LOCALLY false
+
 int CVelodyneROSModel::_nextVelodyneHandle=0;
 
 
 
-CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle)
+CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float frequency,int options,float pointSize,float coloringDistances[2],float scalingFactor,int newPointCloudHandle, int local_frame_handle)
 {
     for (int i=0;i<4;i++)
         _visionSensorHandles[i]=visionSensorHandles[i];
+
+
     _frequency=frequency;
     _displayScalingFactor=1.0f;
     _displayPts=(options&1)==0;
@@ -28,14 +33,17 @@ CVelodyneROSModel::CVelodyneROSModel(const int visionSensorHandles[4],float freq
     lastScanAngle=0.0f;
     _velodyneHandle=_nextVelodyneHandle++;
 
+    _local_frame_handle = local_frame_handle;
+
+
     _RANGE=0;
     _pubVelodyne =ROS_server::getPublisher();
 
     //initialize the fixed fields of the output PointCloud2 message
-    _buffer.header.frame_id="odom";
+    _buffer.header.frame_id="velodyne_link"; // odom ==> velodyne_link
     _buffer.height=1; //unordered data
-    _buffer.fields.resize(3); //convert x/y/z to fields
-    _buffer.fields[0].name = "x"; _buffer.fields[1].name = "y"; _buffer.fields[2].name = "z";
+    _buffer.fields.resize(4); //convert x/y/z/intensity to fields
+    _buffer.fields[0].name = "x"; _buffer.fields[1].name = "y"; _buffer.fields[2].name = "z"; _buffer.fields[3].name = "intensity";
     int offset=0;
     for (size_t d =0; d < _buffer.fields.size(); ++d, offset +=4)
     {
@@ -121,6 +129,14 @@ bool CVelodyneROSModel::handle(float dt)
         simGetObjectMatrix(_visionSensorHandles[0],-1,mainSensTr);
         simGetObjectMatrix(_visionSensorHandles[0],-1,mainSensTrInv);
         simInvertMatrix(mainSensTrInv);
+
+        // get pointcloud locally
+        float local_frame_mat[12];
+        float local_frame_mat_inverse[12];
+        simGetObjectMatrix(_local_frame_handle, -1, local_frame_mat);
+        simGetObjectMatrix(_local_frame_handle, -1, local_frame_mat_inverse);
+        simInvertMatrix(local_frame_mat_inverse);
+
         if (_ptCloudHandle>=0)
             simModifyPointCloud(_ptCloudHandle,0,0,0);
         if (_newPtCloudHandle>=0)
@@ -151,6 +167,24 @@ bool CVelodyneROSModel::handle(float dt)
                 {
                     float farClippingPlane;
                     simGetObjectFloatParameter(_visionSensorHandles[i],1001,&farClippingPlane);
+                    // code added for Intensity field [x,y,z,intensity]
+                    float* img_data;
+                    float img_data2[64][1024] = {0};
+                    float img_data3[65536] = {0};     // 1024 * 64 = 65536
+                    // get image from velodyne vision sensor
+                    img_data = simGetVisionSensorImage(_visionSensorHandles[i]);
+                    for (int j = 0 ; j < 320 ; j++) {      // vision sensor Resolution Y value : 320
+                        for(int i = 0 ; i < 1024 ; i++) {  // vision sensor Resolution X value : 1024
+                            if(j % 5 == 0)
+                                img_data2[j/5][i] = img_data[3*(i+(319-j)*1024)+1];
+                        }
+                    }
+                    // tranpose matrix to visualize intensity fields
+                    for(int i = 0 ; i < 1024 ; i++) {
+                        for (int j = 0 ; j < 64 ; j++) {
+                            img_data3[64*i + j] = img_data2[j][i];
+                        }
+                    }
                     float RR=(farClippingPlane*0.99f)*(farClippingPlane*0.99f);
                     float m[12];
                     simGetObjectMatrix(_visionSensorHandles[i],-1,m);
@@ -165,16 +199,43 @@ bool CVelodyneROSModel::handle(float dt)
                             unsigned char col[3];
                             for (int j=0;j<ptsX*ptsY;j++)
                             {
-                                float p[3]={data[off+4*j+0],data[off+4*j+1],data[off+4*j+2]};
+                                float p[4]={data[off+4*j+0],data[off+4*j+1],data[off+4*j+2],data[off+4*j+3]};
                                 float rr=p[0]*p[0]+p[1]*p[1]+p[2]*p[2];
                                 if (rr<RR)
                                 {
                                     float dp[3]={p[0],p[1],p[2]};
+
+                                    // if true, point clouds are published locally. otherwise globally
+                                    if (_B_LOCALLY){
+                                        m[3] = 0;
+                                        m[7] = 0;
+                                        m[11] = 0;
+                                        mainSensTrInv[3] = 0;
+                                        mainSensTrInv[7] = 0;
+                                        mainSensTrInv[11] = 0;
+
+                                    }
+
                                     simTransformVector(m,p); //directly relative to /odom (which in simulation is actually /map)
+
+
+                                    if(_B_LOCALLY){
+                                        local_frame_mat_inverse[3] = 0;
+                                        local_frame_mat_inverse[7] = 0;
+                                        local_frame_mat_inverse[11] = 0;
+                                        simTransformVector(local_frame_mat_inverse, p);
+                                    }
+
                                     float abs_p[3]={p[0],p[1],p[2]};
-                                    simTransformVector(mainSensTrInv,p);
+
+                                    if(!_B_LOCALLY){
+                                        simTransformVector(mainSensTrInv,p);
+                                    }
+
                                     float a=atan2(p[0],p[2]);
-                                    if (   ((a>=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange)) || ((a<=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange-2.0f*PI_VAL))   )
+
+                                    /* if (   ((a>=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange)) || ((a<=startAnglePlusMinusPi)&&(a<startAnglePlusMinusPi+scanRange-2.0f*PI_VAL))   ) */
+                                    if(true)
                                     {
                                         float r=sqrt(rr);
                                         if (_cartesianCoords)
@@ -182,6 +243,7 @@ bool CVelodyneROSModel::handle(float dt)
                                             pts.push_back(abs_p[0]);
                                             pts.push_back(abs_p[1]);
                                             pts.push_back(abs_p[2]);
+                                            pts.push_back(img_data3[ptsX*ptsY-j]); // intensity field added
                                         }
                                         else
                                         {
@@ -196,9 +258,17 @@ bool CVelodyneROSModel::handle(float dt)
                                             dp[2]*=_displayScalingFactor;
                                             simTransformVector(m,dp);
                                             _displayPtsA.push_back(a);
-                                            _displayPtsXyz.push_back(dp[0]);
-                                            _displayPtsXyz.push_back(dp[1]);
-                                            _displayPtsXyz.push_back(dp[2]);
+                                            if(_B_LOCALLY){
+                                                // compenstate xyz coordinates when you are using Local Frame
+                                                _displayPtsXyz.push_back(dp[0] + local_frame_mat[3]);
+                                                _displayPtsXyz.push_back(dp[1] + local_frame_mat[7]);
+                                                _displayPtsXyz.push_back(dp[2] + local_frame_mat[11]);
+                                            }
+                                            else{
+                                                _displayPtsXyz.push_back(dp[0]);
+                                                _displayPtsXyz.push_back(dp[1]);
+                                                _displayPtsXyz.push_back(dp[2]);
+                                            }
                                             _getColorFromIntensity(1.0f-((r-_coloringDistances[0])/(_coloringDistances[1]-_coloringDistances[0])),col);
                                             _displayPtsCol.push_back(col[0]);
                                             _displayPtsCol.push_back(col[1]);
@@ -322,7 +392,7 @@ void CVelodyneROSModel::_getColorFromIntensity(float intensity,unsigned char col
 
 void CVelodyneROSModel::addPointsToBuffer(std::vector<float> & pts, sensor_msgs::PointCloud2 & buff)
 {
-    int n_points = pts.size()/3;
+    int n_points = pts.size()/4;
     int prev_width= buff.width*buff.point_step;
     buff.width += n_points;
     buff.row_step = buff.point_step*buff.width;
@@ -332,8 +402,9 @@ void CVelodyneROSModel::addPointsToBuffer(std::vector<float> & pts, sensor_msgs:
     //copy data points
     for (int cp = 0; cp < n_points; ++cp)
     {
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[0].offset], &pts[3*cp+0], sizeof(float));
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[1].offset], &pts[3*cp+1], sizeof(float));
-        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[2].offset], &pts[3*cp+2], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[0].offset], &pts[4*cp+0], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[1].offset], &pts[4*cp+1], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[2].offset], &pts[4*cp+2], sizeof(float));
+        memcpy(&buff.data[prev_width + cp * buff.point_step + buff.fields[3].offset], &pts[4*cp+3], sizeof(float)); // intensity field added
     }
 }
