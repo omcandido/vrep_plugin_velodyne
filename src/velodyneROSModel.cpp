@@ -131,7 +131,9 @@ bool CVelodyneROSModel::handle(float dt)
         simInvertMatrix(mainSensTrInv);
 
         // get pointcloud locally
+        float local_frame_mat[12];
         float local_frame_mat_inverse[12];
+        simGetObjectMatrix(_local_frame_handle, -1, local_frame_mat);
         simGetObjectMatrix(_local_frame_handle, -1, local_frame_mat_inverse);
         simInvertMatrix(local_frame_mat_inverse);
 
