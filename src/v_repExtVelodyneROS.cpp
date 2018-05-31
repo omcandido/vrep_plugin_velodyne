@@ -60,6 +60,7 @@ void LUA_CREATEVELODYNEROSMODEL_CALLBACK(SScriptCallBack* p)
             visionSensorHandes[i]=inData->at(0).int32Data[i];
         float frequency=inData->at(1).floatData[0];
         int pointCloudHandle=-1;
+        int LocalFrameHandle;
         if (inData->size()>2)
         { // we have the optional 'options' argument:
             options=inData->at(2).int32Data[0];
@@ -78,10 +79,10 @@ void LUA_CREATEVELODYNEROSMODEL_CALLBACK(SScriptCallBack* p)
             scalingFactor=inData->at(5).floatData[0];
         }
         if (inData->size()>6)
-        { // we have the optional 'pointCloudHandle' argument:
-            pointCloudHandle=inData->at(6).int32Data[0];
+        {
+            LocalFrameHandle=inData->at(6).int32Data[0];
         }
-        CVelodyneROSModel* obj=new CVelodyneROSModel(visionSensorHandes,frequency,options,pointSize,coloringDistances,scalingFactor,pointCloudHandle);
+        CVelodyneROSModel* obj=new CVelodyneROSModel(visionSensorHandes,frequency,options,pointSize,coloringDistances,scalingFactor,pointCloudHandle, LocalFrameHandle);
         velodyneROSModelContainer->addObject(obj);
         if (obj->doAllObjectsExistAndAreVisionSensors())
         {
@@ -229,8 +230,8 @@ VREP_DLLEXPORT unsigned char v_repStart(void* reservedPointer,int reservedInt)
 
     // Register the new Lua commands:
 
-
-    simRegisterScriptCallbackFunction(LUA_CREATEVELODYNEROSMODEL_COMMAND_PLUGIN,strConCat("number velodyneHandle=",LUA_CREATEVELODYNEROSMODEL_COMMAND,"(table_4 visionSensorHandles,number frequency,number options=0,number pointSize=2,table_2 coloring_closeFarDist={1,5},number displayScalingFactor=1)"),LUA_CREATEVELODYNEROSMODEL_CALLBACK);
+    // modified for locally publishing pointcloud
+    simRegisterScriptCallbackFunction(LUA_CREATEVELODYNEROSMODEL_COMMAND_PLUGIN,strConCat("number velodyneHandle=",LUA_CREATEVELODYNEROSMODEL_COMMAND,"(table_4 visionSensorHandles,number frequency,number options=0,number pointSize=2,table_2 coloring_closeFarDist={1,5},number displayScalingFactor=1, number LocalFrameHandle)"),LUA_CREATEVELODYNEROSMODEL_CALLBACK);
     simRegisterScriptCallbackFunction(LUA_DESTROYVELODYNEROSMODEL_COMMAND_PLUGIN,strConCat("number result=",LUA_DESTROYVELODYNEROSMODEL_COMMAND,"(number velodyneHandle)"),LUA_DESTROYVELODYNEROSMODEL_CALLBACK);
     simRegisterScriptCallbackFunction(LUA_HANDLEVELODYNEROSMODEL_COMMAND_PLUGIN,strConCat("table points=",LUA_HANDLEVELODYNEROSMODEL_COMMAND,"(number velodyneHandle,number dt)"),LUA_HANDLEVELODYNEROSMODEL_CALLBACK);
 
