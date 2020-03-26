@@ -3,7 +3,8 @@ project(vrep_plugin_velodyne)
 
 find_package(
 	catkin)
-
+#fix to ros.h not found error
+find_package(catkin REQUIRED COMPONENTS roscpp)
 catkin_package(
                CATKIN_DEPENDS roscpp rosconsole std_msgs roslib
                DEPENDS roscpp rosconsole std_msgs roslib)
