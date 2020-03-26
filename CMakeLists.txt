@@ -10,6 +10,7 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
+link_directories("/opt/ros/melodic/lib")
 link_directories("/opt/ros/groovy/lib")
 link_directories("/opt/ros/hydro/lib")
 link_directories("/opt/ros/indigo/lib")
