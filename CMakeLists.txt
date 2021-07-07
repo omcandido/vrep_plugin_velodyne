@@ -3,13 +3,16 @@ project(vrep_plugin_velodyne)
 
 find_package(
 	catkin)
-
+#fix to ros.h not found error
+find_package(catkin REQUIRED COMPONENTS roscpp)
 catkin_package(
                CATKIN_DEPENDS roscpp rosconsole std_msgs roslib
                DEPENDS roscpp rosconsole std_msgs roslib)
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
+link_directories("/opt/ros/melodic/lib")
+link_directories("/opt/ros/kinetic/lib")
 link_directories("/opt/ros/groovy/lib")
 link_directories("/opt/ros/hydro/lib")
 link_directories("/opt/ros/indigo/lib")
